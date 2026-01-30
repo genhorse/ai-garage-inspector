@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+    stages {
+        stage('Quality Scan') {
+            steps {
+                script {
+                    timeout(time: 15, unit: 'MINUTES') {
+                        waitUntil {
+                            return fileExists('sonar_token.txt') && readFile('sonar_token.txt').trim().length() > 20
+                        }
+                    }
+                    def token = readFile('sonar_token.txt').trim()
+                    sh "sonar-scanner -Dsonar.projectKey=garage-inspector -Dsonar.sources=garage-inspector/app -Dsonar.host.url=http://sonar-server:9000 -Dsonar.login=${token}"
+                }
+            }
+        }
+        stage('AI Remediation') {
+            steps {
+                script {
+                    def token = readFile('sonar_token.txt').trim()
+                    echo "Waiting for SonarQube to process results..."
+                    sleep 15
+
+                    // ---------- Wait for SonarQube background tasks to complete ----------
+                    waitUntil {
+                        def taskResp = sh(script: "curl -s -u ${token}: 'http://sonar-server:9000/api/ce/component?component=garage-inspector'", returnStdout: true).trim()
+                        def isProcessing = sh(script: """
+                            echo '${taskResp}' |
+                            python3 -c 'import sys, json; d=json.load(sys.stdin); q=d.get("queue", []); c=d.get("current", {}); s=c.get("status"); print("IDLE" if not q and s=="SUCCESS" else "BUSY")'
+                        """, returnStdout: true).trim()
+                        return isProcessing == "IDLE"
+                    }
+
+                    // ---------- Query all open issues (BUG + CODE_SMELL) ----------
+                    def resp = sh(script: "curl -s -u ${token}: 'http://sonar-server:9000/api/issues/search?componentKeys=garage-inspector&statuses=OPEN'", returnStdout: true).trim()
+                    def count = sh(script: "echo '${resp}' | python3 -c 'import sys, json; print(json.load(sys.stdin)[\"total\"])'", returnStdout: true).trim().toInteger()
+
+                    if (count > 0) {
+                        echo "Found ${count} bugs. Invoking DeepSeek AI..."
+                        sh "python3 ai_fixer.py"
+                        echo "Fix applied. Triggering verification build..."
+                        // Launch a new build (non-blocking)
+                        build job: env.JOB_NAME, wait: false, propagate: false, quietPeriod: 10
+                        // Mark current build as FAILED (it will turn red)
+                        currentBuild.description = "Auto‑fix applied. Verification build scheduled."
+                        error "Bugs detected (${count}); build marked as FAILURE."
+                    } else {
+                        echo "✅ Quality Gate Passed. No bugs found."
+                        currentBuild.description = "Code is clean."
+                    }
+                }
+            }
+        }
+    }
+}

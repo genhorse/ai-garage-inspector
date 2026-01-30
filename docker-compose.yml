@@ -1,0 +1,51 @@
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    volumes: ["ollama_data:/root/.ollama"]
+    ports: ["11434:11434"]
+    # Проверяем только, что демон запущен; модель может ещё грузиться
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  sonar-server:
+    build: ./sonar-init
+    container_name: sonar-server
+    ports: ["9000:9000"]
+    environment: ["SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true"]
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - ./sonar-init/init-sonarqube.sh:/usr/local/bin/init-sonarqube.sh:ro
+      - ./sonar_token.txt:/opt/sonarqube/token.txt
+    entrypoint: ["/usr/local/bin/init-sonarqube.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/status"]
+      interval: 10s
+      retries: 20
+
+  jenkins:
+    build: ./build-env
+    container_name: ai-garage-inspector-pipeline
+    user: root
+    ports: ["8080:8080"]
+    environment:
+      - CASC_JENKINS_CONFIG=/var/jenkins_home/casc/jenkins.yaml
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true -Dpermissive-script-security.enabled=true
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./build-env/casc:/var/jenkins_home/casc
+      - .:/var/jenkins_home/workspace/Garage-Inspector-Auto-Pipeline
+      - ./sonar_token.txt:/var/jenkins_home/workspace/sonar_token.txt
+      - ./init.groovy.d:/var/jenkins_home/init.groovy.d
+    depends_on:
+      sonar-server: { condition: service_healthy }
+      ollama: { condition: service_started }   # старт, не health
+
+volumes:
+  jenkins_home:
+  sonar_data:
+  ollama_data:

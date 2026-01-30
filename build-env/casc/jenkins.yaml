@@ -1,0 +1,13 @@
+jenkins:
+  numExecutors: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users: [{id: "admin", password: "admin"}]
+  authorizationStrategy:
+    fullControlOnceLoggedIn: {allowAnonymousRead: false}
+jobs:
+  - script: >
+      pipelineJob('Garage-Inspector-Auto-Pipeline') {
+        definition { cps { script(new File('/var/jenkins_home/workspace/Garage-Inspector-Auto-Pipeline/garage-inspector/Jenkinsfile').text); sandbox(true) } }
+      }
