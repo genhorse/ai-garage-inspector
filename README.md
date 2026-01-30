@@ -1,11 +1,14 @@
-# ----------------------------------------------------------------------
-# AI Garage Inspector v1.18 (TOTAL AUTO-REMEDIATION)
-# ----------------------------------------------------------------------
+# AI Garage Inspector v1.18 🤖🚀
+### Automated Self-Healing CI/CD Pipeline
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
 
 ## 📌 PROJECT OVERVIEW
-This project is a high-level **Self-Healing CI/CD Pipeline**. It demonstrates how to integrate static code analysis with a local LLM to automatically fix technical debt and bugs.
+This project implements a high-level **Self-Healing CI/CD Pipeline**. It demonstrates the integration of static code analysis (**SonarQube**) with a local Large Language Model (**DeepSeek-Coder via Ollama**) to automatically identify and fix technical debt.
 
-The system targets a Python-based FastAPI application (current placeholder for the **Neo 512M** project) and uses **DeepSeek-Coder** to perform real-time code patches without human intervention.
+The system monitors a Python-based FastAPI application (current placeholder for the **Neo 512M** core) and uses AI to perform real-time code patches without human intervention.
 
 ## 🛠 TECH STACK
 * **Orchestration:** Jenkins (Configuration as Code, Job-DSL)
